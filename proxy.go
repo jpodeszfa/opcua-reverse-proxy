@@ -25,12 +25,16 @@ type helPktT struct {
 }
 
 func sendError(conn net.Conn, client net.Addr, statusCode uint32, reason string) {
-	ln := uint32(len(reason))
+	ln := len(reason)
+	if ln > 1024 {
+		ln = 1024
+		reason = reason[:ln]
+	}
 
 	frame := []byte{'E', 'R', 'R', 'F'}
-	frame = binary.LittleEndian.AppendUint32(frame, 16+ln)
+	frame = binary.LittleEndian.AppendUint32(frame, 16+uint32(ln))
 	frame = binary.LittleEndian.AppendUint32(frame, statusCode)
-	frame = binary.LittleEndian.AppendUint32(frame, ln)
+	frame = binary.LittleEndian.AppendUint32(frame, uint32(ln))
 	frame = append(frame, []byte(reason)...)
 
 	log.Println("client", client, reason)
@@ -107,7 +111,7 @@ func main() {
 			helloPkt.MessageSize > 32+4096 ||
 			helloPkt.EndpointSize > 4096 ||
 			helloPkt.EndpointSize != helloPkt.MessageSize-32 ||
-			helloPkt.MessageSize != uint32(ln) ||
+			int(helloPkt.MessageSize) != ln ||
 			!utf8.Valid(buf[32:helloPkt.MessageSize]) {
 			sendError(conn, client, 0x80070000, "decoding error")
 			conn.Close()
